@@ -104,9 +104,11 @@ public class DyNet {
 	 * This funciton sends the data to the 0xFFFF address, so it arrives to everybody.
 	 * @param sender The XBee Device that sends the data to everybody
 	 * @param data Hexadecimal data that is sent to everybody.
+	 * @throws XBeeException 
+	 * @throws TimeoutException 
 	 */
-	public void broadcast(XBeeDevice sender, byte[] data){
-		this.sendData(sender, new RemoteXBeeDevice(sender, new XBee64BitAddress("FFFF")), data);
+	public void broadcast(byte[] data) throws TimeoutException, XBeeException{
+		this.device.sendBroadcastData(data);
 	}
 	
 	// TODO Test this function
@@ -153,23 +155,36 @@ public class DyNet {
 	 * First, it finds in which port it is connected.
 	 * Then, it opens the serial connection with the device.
 	 * When the connection is opened, it starts to set the main parameters.
+	 * After that, it creates the listeners as the DyNetListener, to scan the network; and the DyNetDataListener, to receive data.
 	 * At last, it checks if the configuration was set correctly.
 	 */
 	private void config(){
 		try{
+			// Finds the port where the XBee device is plugged in.
 			this.PORT = "COM"+this.findPortAvailable(1);
 			if (this.PORT.equals("COM0")) {System.out.println(">> No port available found."); System.exit(1);}
 			System.out.println(">> Port available found: "+this.PORT);
 			
+			// Connects to the XBee Device using the port found before.
 			this.device = new XBeeDevice(this.PORT, this.BAUD_RATE);
 			
+			// Establishes a serial connection with the device.
 			this.device.open();
 			
+			// Sets the main parameters to the XBee device.
 			this.device.setParameter(this.PARAM_NODE_ID, this.PARAM_VALUE_NODE_ID.getBytes());
 			this.device.setParameter(this.PARAM_PAN_ID, this.PARAM_VALUE_PAN_ID);
 			this.device.setParameter(this.PARAM_DEST_ADDRESS_H, ByteUtils.intToByteArray(this.PARAM_VALUE_DEST_ADDRESS_H));
 			this.device.setParameter(this.PARAM_DEST_ADDRESS_L, ByteUtils.intToByteArray(this.PARAM_VALUE_DEST_ADDRESS_L));
 			
+			// Creating the network listener
+			this.dyNetwork = device.getNetwork();
+			this.dyNetwork.setDiscoveryTimeout(15000);
+			this.dyNetwork.addDiscoveryListener(new DyNetListener());
+			
+			this.device.addDataListener(new DyNetDataListener());
+			
+			// Checking that the configuration has been set correctly.
 			this.checkConfig();
 		}
 		catch(Exception e){
@@ -198,18 +213,8 @@ public class DyNet {
 	 * This function scans the network and adds new devices discovered to the known Remote XBee devices.
 	 */
 	public void discover(){
-		try{
-			this.dyNetwork = device.getNetwork();
-			this.dyNetwork.setDiscoveryTimeout(15000);
-			this.dyNetwork.addDiscoveryListener(new DyNetListener());
-			this.dyNetwork.startDiscoveryProcess();
-			System.out.println(">> Discovering remote XBee devices...");
-		}
-		catch (XBeeException e){
-			e.printStackTrace();
-			device.close();
-			System.exit(1);
-		}
+		this.dyNetwork.startDiscoveryProcess();
+		System.out.println(">> Discovering remote XBee devices...");
 	}
 	
 	/**
