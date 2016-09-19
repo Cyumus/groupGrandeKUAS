@@ -14,6 +14,7 @@ import com.digi.xbee.api.exceptions.PermissionDeniedException;
 import com.digi.xbee.api.exceptions.TimeoutException;
 import com.digi.xbee.api.exceptions.XBeeException;
 import com.digi.xbee.api.models.XBee64BitAddress;
+import com.digi.xbee.api.models.XBeeMessage;
 import com.digi.xbee.api.utils.ByteUtils;
 import com.digi.xbee.api.utils.HexUtils;
 
@@ -182,6 +183,7 @@ public class DyNet {
 			this.dyNetwork.setDiscoveryTimeout(15000);
 			this.dyNetwork.addDiscoveryListener(new DyNetListener());
 			
+			// Creating the data listener
 			this.device.addDataListener(new DyNetDataListener());
 			
 			// Checking that the configuration has been set correctly.
@@ -222,7 +224,36 @@ public class DyNet {
 	 * @param device
 	 */
 	public void deviceFound(RemoteXBeeDevice device){
+		System.out.format(">> Device discovered: %s%n", device.toString());
 		this.remoteXBeeDevices.put(device.getNodeID(), device);
+	}
+	
+	/**
+	 * Prints the message received by the data listener.
+	 * @param msg a message containing the data
+	 */
+	public void print(XBeeMessage msg){
+		System.out.println(this.format(msg));
+	}
+	
+	/**
+	 * A simple function used to centralize main functions.
+	 * @param msg the string
+	 */
+	public void print(String str){
+		System.out.println(str);
+	}
+	
+	/**
+	 * This function formats the XBeeMessage into a pretty String.
+	 * @param msg
+	 * @return the pretty String.
+	 */
+	public String format(XBeeMessage msg){
+		String flag = msg.isBroadcast() ? "[B]":"[M]";
+		return String.format(">> %s[%s]: %s | %s%n",  flag, msg.getDevice().get64BitAddress(),
+				HexUtils.prettyHexString(HexUtils.byteArrayToHexString(msg.getData())),
+				msg.getData());
 	}
 	
 	/**
@@ -257,5 +288,13 @@ public class DyNet {
 	 */
 	public RemoteXBeeDevice getRemoteDevice(String id){
 		return this.remoteXBeeDevices.get(id);
+	}
+	
+	/**
+	 * This function prints an error message
+	 * @param error The error message
+	 */
+	public void error(String error){
+		System.out.println(">> There was an error discovering devices: "+error);
 	}
 }

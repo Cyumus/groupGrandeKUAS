@@ -13,7 +13,6 @@ public class DyNetListener implements IDiscoveryListener{
 	 */
 	@Override
 	public void deviceDiscovered(RemoteXBeeDevice device){
-		System.out.format(">> Device discovered: %s%n", device.toString());
 		DyNet.getSingleton().deviceFound(device);
 	}
 	
@@ -27,7 +26,7 @@ public class DyNetListener implements IDiscoveryListener{
 	 */
 	@Override
 	public void discoveryError(String error){
-		System.out.println(">> There was an error discovering devices: "+error);
+		DyNet.getSingleton().error(error);
 	}
 
 	/**
@@ -41,6 +40,6 @@ public class DyNetListener implements IDiscoveryListener{
 		String msg = ">> Discovery process finished ";
 		msg += error == null ? "successfully":"due to the following error: "+error;
 		msg += DyNet.getSingleton().foundAtLeastOne() ? ".\n>> "+DyNet.getSingleton().getFoundDevices()+" devices found.":" but no device has been found.";
-		System.out.println(msg);
+		DyNet.getSingleton().print(msg);
 	}
 }

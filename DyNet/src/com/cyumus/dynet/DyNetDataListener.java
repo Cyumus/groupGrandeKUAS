@@ -2,7 +2,6 @@ package com.cyumus.dynet;
 
 import com.digi.xbee.api.listeners.IDataReceiveListener;
 import com.digi.xbee.api.models.XBeeMessage;
-import com.digi.xbee.api.utils.HexUtils;
 
 public class DyNetDataListener implements IDataReceiveListener{
 	/**
@@ -15,9 +14,6 @@ public class DyNetDataListener implements IDataReceiveListener{
 	 */
 	@Override
 	public void dataReceived(XBeeMessage xbeeMessage) {
-		String flag = xbeeMessage.isBroadcast() ? "[B]":"[M]";
-		System.out.format(">> %s[%s]: %s | %s%n",  flag, xbeeMessage.getDevice().get64BitAddress(),
-		HexUtils.prettyHexString(HexUtils.byteArrayToHexString(xbeeMessage.getData())),
-		xbeeMessage.getData());
+		DyNet.getSingleton().print(xbeeMessage);
 	}
 }
