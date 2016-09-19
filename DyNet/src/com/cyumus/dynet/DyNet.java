@@ -141,13 +141,13 @@ public class DyNet {
 		this.device.getConnectionInterface().close();
 		this.device.close();
 	}
-	
+	// TODO Create 'util' class to store all these 'util' functions.
 	/**
 	 * Transforms the hexadecimal data into a String
 	 * @param data -> hexadecimal data that listener receives.
 	 * @return -> a string of characters
 	 */
-	public String byteToString(byte[] data){
+	private String byteToString(byte[] data){
 		return HexUtils.prettyHexString(HexUtils.byteArrayToHexString(data));
 	}
 	
@@ -219,6 +219,13 @@ public class DyNet {
 		System.out.println(">> Discovering remote XBee devices...");
 	}
 	
+	public void discoveryFinished(String error){
+		String msg = ">> Discovery process finished ";
+		msg += error == null ? "successfully":"due to the following error: "+error;
+		msg += DyNet.getSingleton().foundAtLeastOne() ? ".\n>> "+DyNet.getSingleton().getFoundDevices()+" devices found.":" but no device has been found.";
+		System.out.println(msg);
+	}
+	
 	/**
 	 * Adds the device discovered to the known Remote XBee devices.
 	 * @param device
@@ -228,20 +235,13 @@ public class DyNet {
 		this.remoteXBeeDevices.put(device.getNodeID(), device);
 	}
 	
+	// TODO Create a 'Messaging' class to store all these communicating functions.
 	/**
 	 * Prints the message received by the data listener.
 	 * @param msg a message containing the data
 	 */
 	public void print(XBeeMessage msg){
 		System.out.println(this.format(msg));
-	}
-	
-	/**
-	 * A simple function used to centralize main functions.
-	 * @param msg the string
-	 */
-	public void print(String str){
-		System.out.println(str);
 	}
 	
 	/**
@@ -252,7 +252,7 @@ public class DyNet {
 	public String format(XBeeMessage msg){
 		String flag = msg.isBroadcast() ? "[B]":"[M]";
 		return String.format(">> %s[%s]: %s | %s%n",  flag, msg.getDevice().get64BitAddress(),
-				HexUtils.prettyHexString(HexUtils.byteArrayToHexString(msg.getData())),
+				this.byteToString(msg.getData()),
 				msg.getData());
 	}
 	

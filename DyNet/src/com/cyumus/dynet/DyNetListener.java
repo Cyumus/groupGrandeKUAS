@@ -37,9 +37,6 @@ public class DyNetListener implements IDiscoveryListener{
 	 */
 	@Override
 	public void discoveryFinished(String error){
-		String msg = ">> Discovery process finished ";
-		msg += error == null ? "successfully":"due to the following error: "+error;
-		msg += DyNet.getSingleton().foundAtLeastOne() ? ".\n>> "+DyNet.getSingleton().getFoundDevices()+" devices found.":" but no device has been found.";
-		DyNet.getSingleton().print(msg);
+		DyNet.getSingleton().discoveryFinished(error);
 	}
 }
