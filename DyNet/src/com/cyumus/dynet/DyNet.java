@@ -22,6 +22,8 @@ public class DyNet {
 	private String PORT = "COM0";
 	private final int BAUD_RATE = 9600;
 	
+	public static int DEFAULT_DISCOVERY_TIMEOUT = 15000;
+	
 	private final String PARAM_NODE_ID = "NI";
 	private final String PARAM_PAN_ID = "ID";
 	private final String PARAM_DEST_ADDRESS_H = "DH";
@@ -29,7 +31,7 @@ public class DyNet {
 	
 	private final String PARAM_VALUE_NODE_ID = "DyNet";
 	
-	private byte[] PARAM_VALUE_PAN_ID = new byte[]{0x11,0x11};
+	private byte[] PARAM_VALUE_PAN_ID = new byte[]{0x1};
 	
 	private final int PARAM_VALUE_DEST_ADDRESS_H = 0x00;
 	private final int PARAM_VALUE_DEST_ADDRESS_L = 0xFFFF;
@@ -56,8 +58,35 @@ public class DyNet {
 	
 	public static void main(String [] args){
 		DyNet dyNet = DyNet.getSingleton();
-		dyNet.discover();
-		// dyNet.sendData(sender , receiver, data);
+		byte[] data = {0x1, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0x87, 0x65, 0x43, 0x21};
+		try{
+			dyNet.discover();
+		}
+		catch(Exception e){
+			System.out.println(e.getMessage());
+			dyNet.closeConnection();
+			System.exit(1);
+		}
+		try {
+			synchronized (dyNet){ 
+				dyNet.wait();
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println(">> Trying to send data...");
+		dyNet.sendData(dyNet.getDevice(), dyNet.getRemoteDevice("0013A20041040854 -  Receiver"), data);
+		System.out.println(">> Trying to broadcast...");
+		try {
+			dyNet.broadcast(data);
+		} catch (XBeeException e) {
+			e.printStackTrace();
+		}
+		/*System.out.println(">> Trying to close remote connection access...");
+		dyNet.closeConnection("0013A20041040854 -  Receiver");*/
+		System.out.println(">> Trying to close serial connection...");
+		dyNet.closeConnection();
 	}
 	
 	/**
@@ -68,7 +97,6 @@ public class DyNet {
 		return dyNet;
 	}
 	
-	// TODO Test this function
 	/**
 	 * This function tries to establish a serial connection with an XBee device in all COM ports possibles until it arrives to COM10.
 	 * If no XBee device was found, it returns the COM0 as default, being as an error to this program.  
@@ -85,7 +113,7 @@ public class DyNet {
 			return findPortAvailable(curr+1);
 		}
 	}
-	// TODO Test this function
+
 	/**
 	 * This functions sends the data from the sender to the receiver
 	 * @param sender The XBee Device that sends the data to the receiver
@@ -100,9 +128,8 @@ public class DyNet {
 		}
 	}
 	
-	// TODO Test this function.
 	/**
-	 * This funciton sends the data to the 0xFFFF address, so it arrives to everybody.
+	 * This function sends the data to the 0xFFFF address, so it arrives to everybody.
 	 * @param sender The XBee Device that sends the data to everybody
 	 * @param data Hexadecimal data that is sent to everybody.
 	 * @throws XBeeException 
@@ -122,7 +149,7 @@ public class DyNet {
 		this.sendData(sender, new RemoteXBeeDevice(sender, new XBee64BitAddress("0000")), data);
 	}
 	
-	// TODO Test this function
+	
 	/**
 	 * This function gets the connection interface of the client and closes it.
 	 * Then, it removes it from the known Remote XBee Devices.
@@ -132,7 +159,7 @@ public class DyNet {
 		this.remoteXBeeDevices.get(client).getConnectionInterface().close();
 		this.remoteXBeeDevices.remove(client);
 	}
-	// TODO Test this function
+	
 	/**
 	 * This function gets the connection interface of the XBee device and closes it.
 	 * Then, it closes the serial connection with the device.
@@ -180,7 +207,7 @@ public class DyNet {
 			
 			// Creating the network listener
 			this.dyNetwork = device.getNetwork();
-			this.dyNetwork.setDiscoveryTimeout(15000);
+			this.dyNetwork.setDiscoveryTimeout(DyNet.DEFAULT_DISCOVERY_TIMEOUT);
 			this.dyNetwork.addDiscoveryListener(new DyNetListener());
 			
 			// Creating the data listener
@@ -213,8 +240,15 @@ public class DyNet {
 	}
 	/**
 	 * This function scans the network and adds new devices discovered to the known Remote XBee devices.
+	 * @throws XBeeException 
+	 * @throws TimeoutException 
 	 */
-	public void discover(){
+	public void discover() throws TimeoutException, XBeeException{
+		this.discover(DyNet.DEFAULT_DISCOVERY_TIMEOUT);
+	}
+	
+	public void discover(int timeout) throws TimeoutException, XBeeException{
+		this.dyNetwork.setDiscoveryTimeout(timeout);
 		this.dyNetwork.startDiscoveryProcess();
 		System.out.println(">> Discovering remote XBee devices...");
 	}
@@ -224,6 +258,13 @@ public class DyNet {
 		msg += error == null ? "successfully":"due to the following error: "+error;
 		msg += DyNet.getSingleton().foundAtLeastOne() ? ".\n>> "+DyNet.getSingleton().getFoundDevices()+" devices found.":" but no device has been found.";
 		System.out.println(msg);
+		synchronized(dyNet){
+			dyNet.notify();
+		}
+	}
+	
+	public boolean isDiscovering(){
+		return this.dyNetwork.isDiscoveryRunning();
 	}
 	
 	/**
@@ -232,7 +273,7 @@ public class DyNet {
 	 */
 	public void deviceFound(RemoteXBeeDevice device){
 		System.out.format(">> Device discovered: %s%n", device.toString());
-		this.remoteXBeeDevices.put(device.getNodeID(), device);
+		this.remoteXBeeDevices.put(device.toString(), device);
 	}
 	
 	// TODO Create a 'Messaging' class to store all these communicating functions.
@@ -253,7 +294,7 @@ public class DyNet {
 		String flag = msg.isBroadcast() ? "[B]":"[M]";
 		return String.format(">> %s[%s]: %s | %s%n",  flag, msg.getDevice().get64BitAddress(),
 				this.byteToString(msg.getData()),
-				msg.getData());
+				msg.getDataString());
 	}
 	
 	/**
@@ -288,6 +329,13 @@ public class DyNet {
 	 */
 	public RemoteXBeeDevice getRemoteDevice(String id){
 		return this.remoteXBeeDevices.get(id);
+	}
+	/**
+	 * This function returns the port where the XBee device of the coordinator is plugged in.
+	 * @return The port of the Coordinator's XBee device, if any. 
+	 */
+	public String getPort(){
+		return this.PORT;
 	}
 	
 	/**

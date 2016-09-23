@@ -8,7 +8,6 @@ public class DyNetTesting extends TestCase {
 	
 	public void setUp(){
 		 dyNet = DyNet.getSingleton();
-		 dyNet.discover();
 	}
 
 	public void testCloseConnectionString() {
@@ -24,7 +23,6 @@ public class DyNetTesting extends TestCase {
 	}
 
 	public void testDiscover() {
-		dyNet.discover();
 		assertEquals(true, dyNet.foundAtLeastOne());
 	}
 
