@@ -1,6 +1,11 @@
 package com.cyumus.dynet;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.Properties;
 import java.util.Timer;
 
 import com.digi.xbee.api.RemoteXBeeDevice;
@@ -25,6 +30,8 @@ public class DyNet {
 	private final int BAUD_RATE = 9600;
 	
 	public static int DEFAULT_DISCOVERY_TIMEOUT = 15000;
+	
+	private Properties config;
 	
 	private final String PARAM_NODE_ID = "NI";
 	private final String PARAM_PAN_ID = "ID";
@@ -178,7 +185,7 @@ public class DyNet {
 	private String byteToString(byte[] data){
 		return HexUtils.prettyHexString(HexUtils.byteArrayToHexString(data));
 	}
-	
+	// TODO Test this function with the file reading instead of the setParameter mess.
 	/**
 	 * This function configures the XBee device.
 	 * First, it finds in which port it is connected.
@@ -201,8 +208,11 @@ public class DyNet {
 			// Establishes a serial connection with the device.
 			this.device.open();
 			
-			// Sets the main parameters to the XBee device.
-			// TODO Implement a file.properties functionality here, instead of this mess.
+			// Reads the configuration file.
+			this.readFromConfigFile();
+			// Sets all the parameters to the device.
+			this.setConfigFromProperties();
+			
 			this.device.setParameter(this.PARAM_NODE_ID, this.PARAM_VALUE_NODE_ID.getBytes());
 			this.device.setParameter(this.PARAM_PAN_ID, this.PARAM_VALUE_PAN_ID);
 			this.device.setParameter(this.PARAM_DEST_ADDRESS_H, ByteUtils.intToByteArray(this.PARAM_VALUE_DEST_ADDRESS_H));
@@ -226,6 +236,56 @@ public class DyNet {
 			System.out.println(e.getMessage());
 			device.close();
 			System.exit(1);
+		}
+	}
+	
+	/**
+	 * This function reads all configuration file settings.
+	 */
+	private void readFromConfigFile(){
+		try{
+			config.load(new FileInputStream("config.properties"));
+		}
+		catch(FileNotFoundException e){
+			this.error("Configuration file not found or corrupted.");
+		}
+		catch(IOException er){
+			this.error("Something with the configuration file was wrong. Maybe it's corrupted.");
+		}
+		
+	}
+	
+	// TODO Test this function
+	/**
+	 * This function sets all the parameters to the device using the properties object.
+	 * @throws XBeeException 
+	 * @throws TimeoutException 
+	 */
+	private void setConfigFromProperties(){
+		this.config.forEach(
+			(k,v) -> {
+				try{
+					this.device.setParameter((String) k, ByteUtils.stringToByteArray((String) v));
+				}
+				catch(XBeeException e){
+					this.error("Something went wrong when setting the device properties.");
+				}
+			}
+		);
+	}
+	
+	/**
+	 * This function saves the Properties object to the config file. 
+	 */
+	private void saveConfig(){
+		try{
+			this.config.store(new FileOutputStream("config.properties"), "Saved new configuration");
+		}
+		catch(FileNotFoundException e){
+			this.error("Configuration file not found or corrupted.");
+		}
+		catch(IOException er){
+			this.error("Something with the configuration file was wrong. Maybe it's corrupted.");
 		}
 	}
 	
