@@ -6,7 +6,9 @@ public enum TypeOfMessage {
 	INPUT ("I"),
 	OUTPUT ("O"),
 	BROADCAST ("B"),
-	ERROR ("ERROR");
+	ERROR ("ERROR"),
+	ADMIN ("A"),
+	CONFIG ("C");
 	
 	private String strFlag;
 	TypeOfMessage(String flag){

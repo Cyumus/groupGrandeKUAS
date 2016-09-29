@@ -291,10 +291,19 @@ public class DyNet {
 	 * @param device
 	 */
 	public void deviceFound(RemoteXBeeDevice device){
-		System.out.format(">> Device discovered: %s%n", device.toString());
+		this.print(String.format("Device discovered: %s%n", device.toString()), TypeOfMessage.CONFIG);
 		this.remoteXBeeDevices.put(device.toString(), device);
 	}
 	
+	// TODO Test this function
+	/**
+	 * This function starts an autodiscover process, in order to update the usertable, adding new devices and removing inactive or lost ones.
+	 * @param delay the time between autodiscovering processes
+	 */
+	public void startAutoDiscovery(long delay){
+		this.print("Starting autodiscovering process...", TypeOfMessage.CONFIG);
+		this.timer.schedule(new DyNetAutodiscover(), delay);
+	}
 	
 	// TODO Create a 'IO' class to store all these Input-Output functions
 	
@@ -306,7 +315,7 @@ public class DyNet {
 	 */
 	public void startLocalADCTask() throws TimeoutException, XBeeException{
 		this.device.setIOConfiguration(AnalogToDigitalConverter.IOLINE_IN, IOMode.ADC);
-		this.timer.schedule(new AnalogToDigitalConverter(), 0, 250);
+		this.timer.schedule(new AnalogToDigitalConverter(), 0);
 	}
 	
 	// TODO Test this function
@@ -318,7 +327,7 @@ public class DyNet {
 	 */
 	public void startRemoteADCTask(RemoteXBeeDevice remoteDevice) throws TimeoutException, XBeeException{
 		remoteDevice.setIOConfiguration(AnalogToDigitalConverter.IOLINE_IN, IOMode.ADC);
-		this.timer.schedule(new AnalogToDigitalConverter(remoteDevice), 0, 250);
+		this.timer.schedule(new AnalogToDigitalConverter(remoteDevice), 0);
 	}
 	
 	// TODO Test this function
