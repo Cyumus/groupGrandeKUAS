@@ -33,18 +33,6 @@ public class DyNet {
 	
 	private Properties config;
 	
-	private final String PARAM_NODE_ID = "NI";
-	private final String PARAM_PAN_ID = "ID";
-	private final String PARAM_DEST_ADDRESS_H = "DH";
-	private final String PARAM_DEST_ADDRESS_L = "DL";
-	
-	private final String PARAM_VALUE_NODE_ID = "DyNet";
-	
-	private byte[] PARAM_VALUE_PAN_ID = new byte[]{0x1};
-	
-	private final int PARAM_VALUE_DEST_ADDRESS_H = 0x00;
-	private final int PARAM_VALUE_DEST_ADDRESS_L = 0xFFFF;
-	
 	private XBeeDevice device;
 	private XBeeNetwork dyNetwork;
 	
@@ -62,6 +50,7 @@ public class DyNet {
 	 */
 	private DyNet(){
 		this.remoteXBeeDevices = new HashMap<String, RemoteXBeeDevice>();
+		this.config = new Properties();
 		
 		this.config();
 	}
@@ -132,7 +121,7 @@ public class DyNet {
 		try {
 			sender.sendData(receiver, data);
 		} catch (XBeeException e) {
-			System.out.println(">> "+e.getMessage());
+			this.error(e.getMessage());
 		}
 	}
 	
@@ -200,7 +189,7 @@ public class DyNet {
 			// Finds the port where the XBee device is plugged in.
 			this.PORT = "COM"+this.findPortAvailable(1);
 			if (this.PORT.equals("COM0")) {System.out.println(">> No port available found."); System.exit(1);}
-			System.out.println(">> Port available found: "+this.PORT);
+			this.print("Port available found: "+this.PORT, TypeOfMessage.CONFIG);
 			
 			// Connects to the XBee Device using the port found before.
 			this.device = new XBeeDevice(this.PORT, this.BAUD_RATE);
@@ -213,11 +202,6 @@ public class DyNet {
 			// Sets all the parameters to the device.
 			this.setConfigFromProperties();
 			
-			this.device.setParameter(this.PARAM_NODE_ID, this.PARAM_VALUE_NODE_ID.getBytes());
-			this.device.setParameter(this.PARAM_PAN_ID, this.PARAM_VALUE_PAN_ID);
-			this.device.setParameter(this.PARAM_DEST_ADDRESS_H, ByteUtils.intToByteArray(this.PARAM_VALUE_DEST_ADDRESS_H));
-			this.device.setParameter(this.PARAM_DEST_ADDRESS_L, ByteUtils.intToByteArray(this.PARAM_VALUE_DEST_ADDRESS_L));
-			
 			// Creating the network listener
 			this.dyNetwork = device.getNetwork();
 			this.dyNetwork.setDiscoveryTimeout(DyNet.DEFAULT_DISCOVERY_TIMEOUT);
@@ -229,8 +213,7 @@ public class DyNet {
 			// Creates the timer for the scheduled tasks.
 			this.timer = new Timer();
 			
-			// Checking that the configuration has been set correctly.
-			this.checkConfig();
+			this.print("All parameters were set correctly", TypeOfMessage.CONFIG);
 		}
 		catch(Exception e){
 			System.out.println(e.getMessage());
@@ -265,7 +248,7 @@ public class DyNet {
 		this.config.forEach(
 			(k,v) -> {
 				try{
-					this.device.setParameter((String) k, ByteUtils.stringToByteArray((String) v));
+					this.device.setParameter((String) k, HexUtils.hexStringToByteArray((String) v));
 				}
 				catch(XBeeException e){
 					this.error("Something went wrong when setting the device properties.");
@@ -290,21 +273,6 @@ public class DyNet {
 	}
 	
 	/**
-	 * This function checks if the configuration was set correctly.
-	 * @throws Exception
-	 */
-	private void checkConfig() throws Exception{
-		byte [] ni = this.device.getParameter(this.PARAM_NODE_ID),
-				id = this.device.getParameter(this.PARAM_PAN_ID),
-				dh = this.device.getParameter(this.PARAM_DEST_ADDRESS_H),
-				dl = this.device.getParameter(this.PARAM_DEST_ADDRESS_L);
-		if (ni.equals(this.PARAM_NODE_ID)){throw new Exception("NI parameter was not set correctly.");}
-		if (ByteUtils.byteArrayToLong(id) != ByteUtils.byteArrayToLong(this.PARAM_VALUE_PAN_ID)){throw new Exception("ID parameter was not set correctly");}
-		if (ByteUtils.byteArrayToInt(dh) != this.PARAM_VALUE_DEST_ADDRESS_H){throw new Exception("DH parameter was not set correctly.");}
-		if (ByteUtils.byteArrayToInt(dl) != this.PARAM_VALUE_DEST_ADDRESS_L){throw new Exception("DL parameter was not set correctly.");}
-		System.out.println(">> All parameters were set correctly!");
-	}
-	/**
 	 * This function scans the network and adds new devices discovered to the known Remote XBee devices.
 	 * It waits the DyNet main function while discovering.
 	 * @throws XBeeException 
@@ -318,7 +286,7 @@ public class DyNet {
 	public void discover(int timeout) throws TimeoutException, XBeeException, InterruptedException{
 		this.dyNetwork.setDiscoveryTimeout(timeout);
 		this.dyNetwork.startDiscoveryProcess();
-		System.out.println(">> Discovering remote XBee devices...");
+		this.print("Discovering remote XBee devices...", TypeOfMessage.CONFIG);
 		synchronized (dyNet){ 
 			dyNet.wait();
 		}
@@ -330,10 +298,10 @@ public class DyNet {
 	 * @param error
 	 */
 	public void discoveryFinished(String error){
-		String msg = ">> Discovery process finished ";
+		String msg = "Discovery process finished ";
 		msg += error == null ? "successfully":"due to the following error: "+error;
 		msg += DyNet.getSingleton().foundAtLeastOne() ? ".\n>> "+DyNet.getSingleton().getFoundDevices()+" devices found.":" but no device has been found.";
-		System.out.println(msg);
+		this.print(msg, TypeOfMessage.CONFIG);
 		synchronized(dyNet){
 			dyNet.notify();
 		}
@@ -423,7 +391,7 @@ public class DyNet {
 	}
 	
 	public String format(String msg, TypeOfMessage type){
-		return String.format(">> [%s]:%s", type, msg);
+		return String.format(">> [%s]: %s", type, msg);
 	}
 	
 	/**

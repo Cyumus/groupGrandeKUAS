@@ -1,14 +1,15 @@
 package com.cyumus.dynet;
 
 public enum TypeOfMessage {
-	SIMPLE ("S"), 
-	IMPORTANT ("*"), 
+	SIMPLE ("M"), 
+	IMPORTANT ("/!\\"), 
 	INPUT ("I"),
 	OUTPUT ("O"),
 	BROADCAST ("B"),
 	ERROR ("ERROR"),
-	ADMIN ("A"),
-	CONFIG ("C");
+	ADMIN ("ADMIN"),
+	CONFIG ("CONFIG"),
+	SERVER ("SERVER");
 	
 	private String strFlag;
 	TypeOfMessage(String flag){
