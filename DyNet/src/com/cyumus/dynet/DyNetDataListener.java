@@ -14,6 +14,8 @@ public class DyNetDataListener implements IDataReceiveListener{
 	 */
 	@Override
 	public void dataReceived(XBeeMessage xbeeMessage) {
-		DyNet.getSingleton().print(xbeeMessage);
+		TypeOfMessage type = xbeeMessage.isBroadcast()?
+				TypeOfMessage.BROADCAST : TypeOfMessage.SIMPLE;
+		DyNet.getSingleton().print(xbeeMessage, type);
 	}
 }

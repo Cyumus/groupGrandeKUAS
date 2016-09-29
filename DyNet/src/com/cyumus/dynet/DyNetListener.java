@@ -26,7 +26,7 @@ public class DyNetListener implements IDiscoveryListener{
 	 */
 	@Override
 	public void discoveryError(String error){
-		DyNet.getSingleton().error(error);
+		DyNet.getSingleton().error(">> There was an error discovering devices: "+error);
 	}
 
 	/**

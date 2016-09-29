@@ -1,6 +1,7 @@
 package com.cyumus.dynet;
 
 import java.util.HashMap;
+import java.util.Timer;
 
 import com.digi.xbee.api.RemoteXBeeDevice;
 import com.digi.xbee.api.XBee;
@@ -13,6 +14,7 @@ import com.digi.xbee.api.exceptions.InvalidInterfaceException;
 import com.digi.xbee.api.exceptions.PermissionDeniedException;
 import com.digi.xbee.api.exceptions.TimeoutException;
 import com.digi.xbee.api.exceptions.XBeeException;
+import com.digi.xbee.api.io.IOMode;
 import com.digi.xbee.api.models.XBee64BitAddress;
 import com.digi.xbee.api.models.XBeeMessage;
 import com.digi.xbee.api.utils.ByteUtils;
@@ -43,6 +45,8 @@ public class DyNet {
 	
 	private HashMap<String, RemoteXBeeDevice> remoteXBeeDevices;
 	
+	private Timer timer;
+	
 	
 	/**
 	 * Main constructor of DyNet class
@@ -67,13 +71,6 @@ public class DyNet {
 			dyNet.closeConnection();
 			System.exit(1);
 		}
-		try {
-			synchronized (dyNet){ 
-				dyNet.wait();
-			}
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
 		
 		System.out.println(">> Trying to send data...");
 		dyNet.sendData(dyNet.getDevice(), dyNet.getRemoteDevice("0013A20041040854 -  Receiver"), data);
@@ -83,10 +80,14 @@ public class DyNet {
 		} catch (XBeeException e) {
 			e.printStackTrace();
 		}
+		
+		System.out.println(">> Trying to send data to server...");
+		dyNet.sendToServer(dyNet.getDevice(), data);
 		/*System.out.println(">> Trying to close remote connection access...");
 		dyNet.closeConnection("0013A20041040854 -  Receiver");*/
-		System.out.println(">> Trying to close serial connection...");
-		dyNet.closeConnection();
+		/*System.out.println(">> Trying to close serial connection...");
+		dyNet.closeConnection();*/
+		
 	}
 	
 	/**
@@ -184,6 +185,7 @@ public class DyNet {
 	 * Then, it opens the serial connection with the device.
 	 * When the connection is opened, it starts to set the main parameters.
 	 * After that, it creates the listeners as the DyNetListener, to scan the network; and the DyNetDataListener, to receive data.
+	 * Creates the timer that all scheduled tasks will use.
 	 * At last, it checks if the configuration was set correctly.
 	 */
 	private void config(){
@@ -200,6 +202,7 @@ public class DyNet {
 			this.device.open();
 			
 			// Sets the main parameters to the XBee device.
+			// TODO Implement a file.properties functionality here, instead of this mess.
 			this.device.setParameter(this.PARAM_NODE_ID, this.PARAM_VALUE_NODE_ID.getBytes());
 			this.device.setParameter(this.PARAM_PAN_ID, this.PARAM_VALUE_PAN_ID);
 			this.device.setParameter(this.PARAM_DEST_ADDRESS_H, ByteUtils.intToByteArray(this.PARAM_VALUE_DEST_ADDRESS_H));
@@ -212,6 +215,9 @@ public class DyNet {
 			
 			// Creating the data listener
 			this.device.addDataListener(new DyNetDataListener());
+			
+			// Creates the timer for the scheduled tasks.
+			this.timer = new Timer();
 			
 			// Checking that the configuration has been set correctly.
 			this.checkConfig();
@@ -240,19 +246,29 @@ public class DyNet {
 	}
 	/**
 	 * This function scans the network and adds new devices discovered to the known Remote XBee devices.
+	 * It waits the DyNet main function while discovering.
 	 * @throws XBeeException 
 	 * @throws TimeoutException 
+	 * @throws InterruptedException 
 	 */
-	public void discover() throws TimeoutException, XBeeException{
+	public void discover() throws TimeoutException, XBeeException, InterruptedException{
 		this.discover(DyNet.DEFAULT_DISCOVERY_TIMEOUT);
 	}
 	
-	public void discover(int timeout) throws TimeoutException, XBeeException{
+	public void discover(int timeout) throws TimeoutException, XBeeException, InterruptedException{
 		this.dyNetwork.setDiscoveryTimeout(timeout);
 		this.dyNetwork.startDiscoveryProcess();
 		System.out.println(">> Discovering remote XBee devices...");
+		synchronized (dyNet){ 
+			dyNet.wait();
+		}
 	}
 	
+	/**
+	 * This function is used by the DyNetListener just after the discovery process has been finished.
+	 * When finished, the main functionality of DyNet is resumed.
+	 * @param error
+	 */
 	public void discoveryFinished(String error){
 		String msg = ">> Discovery process finished ";
 		msg += error == null ? "successfully":"due to the following error: "+error;
@@ -263,6 +279,9 @@ public class DyNet {
 		}
 	}
 	
+	/**
+	 * @return if the DyNet network is discovering
+	 */
 	public boolean isDiscovering(){
 		return this.dyNetwork.isDiscoveryRunning();
 	}
@@ -276,13 +295,51 @@ public class DyNet {
 		this.remoteXBeeDevices.put(device.toString(), device);
 	}
 	
+	
+	// TODO Create a 'IO' class to store all these Input-Output functions
+	
+	// TODO Test this function
+	/**
+	 * This function starts an Analog-To-Digital scheduled task, reading all input data from local.
+	 * @throws TimeoutException
+	 * @throws XBeeException
+	 */
+	public void startLocalADCTask() throws TimeoutException, XBeeException{
+		this.device.setIOConfiguration(AnalogToDigitalConverter.IOLINE_IN, IOMode.ADC);
+		this.timer.schedule(new AnalogToDigitalConverter(), 0, 250);
+	}
+	
+	// TODO Test this function
+	/**
+	 * This function starts a Remote Analog-To-Digital scheduled task, reading all input data from the given remote XBee device.
+	 * @param remoteDevice from where the data comes.
+	 * @throws TimeoutException
+	 * @throws XBeeException
+	 */
+	public void startRemoteADCTask(RemoteXBeeDevice remoteDevice) throws TimeoutException, XBeeException{
+		remoteDevice.setIOConfiguration(AnalogToDigitalConverter.IOLINE_IN, IOMode.ADC);
+		this.timer.schedule(new AnalogToDigitalConverter(remoteDevice), 0, 250);
+	}
+	
+	// TODO Test this function
+	/**
+	 * This function stops all scheduled tasks in the timer.
+	 */
+	public void stopTimer(){
+		this.timer.cancel();
+	}
+	
+	
 	// TODO Create a 'Messaging' class to store all these communicating functions.
 	/**
 	 * Prints the message received by the data listener.
 	 * @param msg a message containing the data
 	 */
-	public void print(XBeeMessage msg){
-		System.out.println(this.format(msg));
+	public void print(XBeeMessage msg, TypeOfMessage type){
+		System.out.println(this.format(msg, type));
+	}
+	public void print(String msg, TypeOfMessage type){
+		System.out.println(this.format(msg,type));
 	}
 	
 	/**
@@ -290,11 +347,14 @@ public class DyNet {
 	 * @param msg
 	 * @return the pretty String.
 	 */
-	public String format(XBeeMessage msg){
-		String flag = msg.isBroadcast() ? "[B]":"[M]";
-		return String.format(">> %s[%s]: %s | %s%n",  flag, msg.getDevice().get64BitAddress(),
+	public String format(XBeeMessage msg, TypeOfMessage type){
+		return String.format(">> %s[%s]: %s | %s%n",  type, msg.getDevice().get64BitAddress(),
 				this.byteToString(msg.getData()),
 				msg.getDataString());
+	}
+	
+	public String format(String msg, TypeOfMessage type){
+		return String.format(">> [%s]:%s", type, msg);
 	}
 	
 	/**
@@ -343,6 +403,6 @@ public class DyNet {
 	 * @param error The error message
 	 */
 	public void error(String error){
-		System.out.println(">> There was an error discovering devices: "+error);
+		this.print(error, TypeOfMessage.ERROR);
 	}
 }
