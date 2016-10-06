@@ -1,37 +1,27 @@
 package com.cyumus.dynet;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.Properties;
 import java.util.Timer;
 
+import com.cyumus.dynet.config.DyNetConfiguration;
+import com.cyumus.dynet.discovery.DyNetDiscover;
+import com.cyumus.dynet.discovery.DyNetDiscovering;
+import com.cyumus.dynet.tasks.AnalogToDigitalConverter;
+import com.cyumus.dynet.tasks.DyNetAutodiscover;
+import com.cyumus.util.Printer;
+import com.cyumus.util.TypeOfMessage;
 import com.digi.xbee.api.RemoteXBeeDevice;
-import com.digi.xbee.api.XBee;
 import com.digi.xbee.api.XBeeDevice;
 import com.digi.xbee.api.XBeeNetwork;
-import com.digi.xbee.api.connection.IConnectionInterface;
-import com.digi.xbee.api.exceptions.InterfaceInUseException;
-import com.digi.xbee.api.exceptions.InvalidConfigurationException;
-import com.digi.xbee.api.exceptions.InvalidInterfaceException;
-import com.digi.xbee.api.exceptions.PermissionDeniedException;
 import com.digi.xbee.api.exceptions.TimeoutException;
 import com.digi.xbee.api.exceptions.XBeeException;
 import com.digi.xbee.api.io.IOMode;
 import com.digi.xbee.api.models.XBee64BitAddress;
-import com.digi.xbee.api.models.XBeeMessage;
-import com.digi.xbee.api.utils.ByteUtils;
-import com.digi.xbee.api.utils.HexUtils;
 
-public class DyNet {
-	private String PORT = "COM0";
-	private final int BAUD_RATE = 9600;
+public class DyNet {		
+	private DyNetConfiguration config;
 	
-	public static int DEFAULT_DISCOVERY_TIMEOUT = 15000;
-	
-	private Properties config;
+	private DyNetDiscovering discover;
 	
 	private XBeeDevice device;
 	private XBeeNetwork dyNetwork;
@@ -50,11 +40,15 @@ public class DyNet {
 	 */
 	private DyNet(){
 		this.remoteXBeeDevices = new HashMap<String, RemoteXBeeDevice>();
-		this.config = new Properties();
 		
-		this.config();
+		// Creates the configuration of the DyNet.
+		this.config = new DyNetConfiguration();
+		
+		// Creates the timer for the scheduled tasks.
+		this.timer = new Timer();
+		
+		this.discover = new DyNetDiscover();
 	}
-	
 	
 	public static void main(String [] args){
 		DyNet dyNet = DyNet.getSingleton();
@@ -93,24 +87,17 @@ public class DyNet {
 		if (dyNet == null) dyNet = new DyNet();
 		return dyNet;
 	}
-	
-	/**
-	 * This function tries to establish a serial connection with an XBee device in all COM ports possibles until it arrives to COM10.
-	 * If no XBee device was found, it returns the COM0 as default, being as an error to this program.  
-	 * @param curr Current port number.
-	 * @return The COM port where the XBee was found.
-	 */
-	private int findPortAvailable(int curr){
-		if (curr >= 10 || curr < 1) return 0;
-		try {
-			IConnectionInterface connection = XBee.createConnectiontionInterface("COM"+curr, BAUD_RATE);
-			connection.open(); connection.close();
-			return curr;
-		} catch (InvalidInterfaceException | InterfaceInUseException | PermissionDeniedException | InvalidConfigurationException er){
-			return findPortAvailable(curr+1);
-		}
-	}
 
+	/**
+	 * This function starts the discovering process.
+	 * @throws TimeoutException
+	 * @throws XBeeException
+	 * @throws InterruptedException
+	 */
+	public void discover() throws TimeoutException, XBeeException, InterruptedException{
+		this.discover.discover((Integer) DyNet.getSingleton().getConfig().get("DEFAULT_DISCOVERY_TIMEOUT"));
+	}
+	
 	/**
 	 * This functions sends the data from the sender to the receiver
 	 * @param sender The XBee Device that sends the data to the receiver
@@ -121,7 +108,7 @@ public class DyNet {
 		try {
 			sender.sendData(receiver, data);
 		} catch (XBeeException e) {
-			this.error(e.getMessage());
+			Printer.error(e.getMessage());
 		}
 	}
 	
@@ -165,163 +152,6 @@ public class DyNet {
 		this.device.getConnectionInterface().close();
 		this.device.close();
 	}
-	// TODO Create 'util' class to store all these 'util' functions.
-	/**
-	 * Transforms the hexadecimal data into a String
-	 * @param data -> hexadecimal data that listener receives.
-	 * @return -> a string of characters
-	 */
-	private String byteToString(byte[] data){
-		return HexUtils.prettyHexString(HexUtils.byteArrayToHexString(data));
-	}
-	// TODO Test this function with the file reading instead of the setParameter mess.
-	/**
-	 * This function configures the XBee device.
-	 * First, it finds in which port it is connected.
-	 * Then, it opens the serial connection with the device.
-	 * When the connection is opened, it starts to set the main parameters.
-	 * After that, it creates the listeners as the DyNetListener, to scan the network; and the DyNetDataListener, to receive data.
-	 * Creates the timer that all scheduled tasks will use.
-	 * At last, it checks if the configuration was set correctly.
-	 */
-	private void config(){
-		try{
-			// Finds the port where the XBee device is plugged in.
-			this.PORT = "COM"+this.findPortAvailable(1);
-			if (this.PORT.equals("COM0")) {System.out.println(">> No port available found."); System.exit(1);}
-			this.print("Port available found: "+this.PORT, TypeOfMessage.CONFIG);
-			
-			// Connects to the XBee Device using the port found before.
-			this.device = new XBeeDevice(this.PORT, this.BAUD_RATE);
-			
-			// Establishes a serial connection with the device.
-			this.device.open();
-			
-			// Reads the configuration file.
-			this.readFromConfigFile();
-			// Sets all the parameters to the device.
-			this.setConfigFromProperties();
-			
-			// Creating the network listener
-			this.dyNetwork = device.getNetwork();
-			this.dyNetwork.setDiscoveryTimeout(DyNet.DEFAULT_DISCOVERY_TIMEOUT);
-			this.dyNetwork.addDiscoveryListener(new DyNetListener());
-			
-			// Creating the data listener
-			this.device.addDataListener(new DyNetDataListener());
-			
-			// Creates the timer for the scheduled tasks.
-			this.timer = new Timer();
-			
-			this.print("All parameters were set correctly", TypeOfMessage.CONFIG);
-		}
-		catch(Exception e){
-			System.out.println(e.getMessage());
-			device.close();
-			System.exit(1);
-		}
-	}
-	
-	/**
-	 * This function reads all configuration file settings.
-	 */
-	private void readFromConfigFile(){
-		try{
-			config.load(new FileInputStream("config.properties"));
-		}
-		catch(FileNotFoundException e){
-			this.error("Configuration file not found or corrupted.");
-		}
-		catch(IOException er){
-			this.error("Something with the configuration file was wrong. Maybe it's corrupted.");
-		}
-		
-	}
-	
-	// TODO Test this function
-	/**
-	 * This function sets all the parameters to the device using the properties object.
-	 * @throws XBeeException 
-	 * @throws TimeoutException 
-	 */
-	private void setConfigFromProperties(){
-		this.config.forEach(
-			(k,v) -> {
-				try{
-					this.device.setParameter((String) k, HexUtils.hexStringToByteArray((String) v));
-				}
-				catch(XBeeException e){
-					this.error("Something went wrong when setting the device properties.");
-				}
-			}
-		);
-	}
-	
-	/**
-	 * This function saves the Properties object to the config file. 
-	 */
-	private void saveConfig(){
-		try{
-			this.config.store(new FileOutputStream("config.properties"), "Saved new configuration");
-		}
-		catch(FileNotFoundException e){
-			this.error("Configuration file not found or corrupted.");
-		}
-		catch(IOException er){
-			this.error("Something with the configuration file was wrong. Maybe it's corrupted.");
-		}
-	}
-	
-	/**
-	 * This function scans the network and adds new devices discovered to the known Remote XBee devices.
-	 * It waits the DyNet main function while discovering.
-	 * @throws XBeeException 
-	 * @throws TimeoutException 
-	 * @throws InterruptedException 
-	 */
-	public void discover() throws TimeoutException, XBeeException, InterruptedException{
-		this.discover(DyNet.DEFAULT_DISCOVERY_TIMEOUT);
-	}
-	
-	public void discover(int timeout) throws TimeoutException, XBeeException, InterruptedException{
-		this.dyNetwork.setDiscoveryTimeout(timeout);
-		this.dyNetwork.startDiscoveryProcess();
-		this.print("Discovering remote XBee devices...", TypeOfMessage.CONFIG);
-		synchronized (dyNet){ 
-			dyNet.wait();
-		}
-	}
-	
-	/**
-	 * This function is used by the DyNetListener just after the discovery process has been finished.
-	 * When finished, the main functionality of DyNet is resumed.
-	 * @param error
-	 */
-	public void discoveryFinished(String error){
-		String msg = "Discovery process finished ";
-		msg += error == null ? "successfully":"due to the following error: "+error;
-		msg += DyNet.getSingleton().foundAtLeastOne() ? ".\n>> "+DyNet.getSingleton().getFoundDevices()+" devices found.":" but no device has been found.";
-		this.print(msg, TypeOfMessage.CONFIG);
-		synchronized(dyNet){
-			dyNet.notify();
-		}
-	}
-	
-	/**
-	 * @return if the DyNet network is discovering
-	 */
-	public boolean isDiscovering(){
-		return this.dyNetwork.isDiscoveryRunning();
-	}
-	
-	/**
-	 * Adds the device discovered to the known Remote XBee devices.
-	 * @param device
-	 */
-	public void deviceFound(RemoteXBeeDevice device){
-		this.print(String.format("Device discovered: %s%n", device.toString()), TypeOfMessage.CONFIG);
-		this.remoteXBeeDevices.put(device.toString(), device);
-	}
 	
 	// TODO Test this function
 	/**
@@ -329,7 +159,7 @@ public class DyNet {
 	 * @param delay the time between autodiscovering processes
 	 */
 	public void startAutoDiscovery(long delay){
-		this.print("Starting autodiscovering process...", TypeOfMessage.CONFIG);
+		Printer.print("Starting autodiscovering process...", TypeOfMessage.CONFIG);
 		this.timer.schedule(new DyNetAutodiscover(), delay);
 	}
 	
@@ -366,34 +196,6 @@ public class DyNet {
 		this.timer.cancel();
 	}
 	
-	
-	// TODO Create a 'Messaging' class to store all these communicating functions.
-	/**
-	 * Prints the message received by the data listener.
-	 * @param msg a message containing the data
-	 */
-	public void print(XBeeMessage msg, TypeOfMessage type){
-		System.out.println(this.format(msg, type));
-	}
-	public void print(String msg, TypeOfMessage type){
-		System.out.println(this.format(msg,type));
-	}
-	
-	/**
-	 * This function formats the XBeeMessage into a pretty String.
-	 * @param msg
-	 * @return the pretty String.
-	 */
-	public String format(XBeeMessage msg, TypeOfMessage type){
-		return String.format(">> %s[%s]: %s | %s%n",  type, msg.getDevice().get64BitAddress(),
-				this.byteToString(msg.getData()),
-				msg.getDataString());
-	}
-	
-	public String format(String msg, TypeOfMessage type){
-		return String.format(">> [%s]: %s", type, msg);
-	}
-	
 	/**
 	 * @return if the device has found at least one XBee Device.
 	 */
@@ -427,19 +229,24 @@ public class DyNet {
 	public RemoteXBeeDevice getRemoteDevice(String id){
 		return this.remoteXBeeDevices.get(id);
 	}
+	
 	/**
-	 * This function returns the port where the XBee device of the coordinator is plugged in.
-	 * @return The port of the Coordinator's XBee device, if any. 
+	 * This function adds a new device to the known devices.
+	 * @param device
 	 */
-	public String getPort(){
-		return this.PORT;
+	public void addRemoteDevice(RemoteXBeeDevice device){
+		this.remoteXBeeDevices.put(device.toString(), device);
 	}
 	
 	/**
-	 * This function prints an error message
-	 * @param error The error message
+	 * Gets the configuration of DyNet
+	 * @return
 	 */
-	public void error(String error){
-		this.print(error, TypeOfMessage.ERROR);
+	public DyNetConfiguration getConfig(){
+		return this.config;
+	}
+	
+	public DyNetDiscovering getDiscovering(){
+		return this.discover;
 	}
 }
