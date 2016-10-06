@@ -6,8 +6,9 @@ import java.util.Timer;
 import com.cyumus.dynet.config.DyNetConfiguration;
 import com.cyumus.dynet.discovery.DyNetDiscover;
 import com.cyumus.dynet.discovery.DyNetDiscovering;
-import com.cyumus.dynet.tasks.AnalogToDigitalConverter;
+import com.cyumus.dynet.tasks.AnalogToDigitalConverterTask;
 import com.cyumus.dynet.tasks.DyNetAutodiscover;
+import com.cyumus.dynet.tasks.TaskController;
 import com.cyumus.util.Printer;
 import com.cyumus.util.TypeOfMessage;
 import com.digi.xbee.api.RemoteXBeeDevice;
@@ -23,14 +24,11 @@ public class DyNet {
 	
 	private DyNetDiscovering discover;
 	
-	private XBeeDevice device;
-	private XBeeNetwork dyNetwork;
-	
 	private static DyNet dyNet;
 	
 	private HashMap<String, RemoteXBeeDevice> remoteXBeeDevices;
 	
-	private Timer timer;
+	private TaskController taskcontroller;
 	
 	
 	/**
@@ -43,9 +41,6 @@ public class DyNet {
 		
 		// Creates the configuration of the DyNet.
 		this.config = new DyNetConfiguration();
-		
-		// Creates the timer for the scheduled tasks.
-		this.timer = new Timer();
 		
 		this.discover = new DyNetDiscover();
 	}
@@ -99,7 +94,7 @@ public class DyNet {
 	}
 	
 	/**
-	 * This functions sends the data from the sender to the receiver
+	 * This function sends the data from the sender to the receiver
 	 * @param sender The XBee Device that sends the data to the receiver
 	 * @param receiver The Remote XBee Device that receives the data sent from the sender.
 	 * @param data Hexadecimal data that is sent by the sender to the receiver
@@ -113,6 +108,20 @@ public class DyNet {
 	}
 	
 	/**
+	 * This function sends the data in asynchronous mode from the sender to the receiver
+	 * @param sender The XBee Device that sends the data to the receiver
+	 * @param receiver The Remote XBee Device that receives the data sent from the sender
+	 * @param data Hexadecimal data that is sent by the sender to the receiver
+	 */
+	public void sendDataAsync(XBeeDevice sender, RemoteXBeeDevice receiver, byte[] data){
+		try{
+			sender.sendDataAsync(receiver, data);
+		} catch(XBeeException e){
+			Printer.error(e.getMessage());
+		}
+	}
+	
+	/**
 	 * This function sends the data to the 0xFFFF address, so it arrives to everybody.
 	 * @param sender The XBee Device that sends the data to everybody
 	 * @param data Hexadecimal data that is sent to everybody.
@@ -120,7 +129,7 @@ public class DyNet {
 	 * @throws TimeoutException 
 	 */
 	public void broadcast(byte[] data) throws TimeoutException, XBeeException{
-		this.device.sendBroadcastData(data);
+		this.getDevice().sendBroadcastData(data);
 	}
 	
 	// TODO Test this function
@@ -149,51 +158,8 @@ public class DyNet {
 	 * Then, it closes the serial connection with the device.
 	 */
 	public void closeConnection(){
-		this.device.getConnectionInterface().close();
-		this.device.close();
-	}
-	
-	// TODO Test this function
-	/**
-	 * This function starts an autodiscover process, in order to update the usertable, adding new devices and removing inactive or lost ones.
-	 * @param delay the time between autodiscovering processes
-	 */
-	public void startAutoDiscovery(long delay){
-		Printer.print("Starting autodiscovering process...", TypeOfMessage.CONFIG);
-		this.timer.schedule(new DyNetAutodiscover(), delay);
-	}
-	
-	// TODO Create a 'IO' class to store all these Input-Output functions
-	
-	// TODO Test this function
-	/**
-	 * This function starts an Analog-To-Digital scheduled task, reading all input data from local.
-	 * @throws TimeoutException
-	 * @throws XBeeException
-	 */
-	public void startLocalADCTask() throws TimeoutException, XBeeException{
-		this.device.setIOConfiguration(AnalogToDigitalConverter.IOLINE_IN, IOMode.ADC);
-		this.timer.schedule(new AnalogToDigitalConverter(), 0);
-	}
-	
-	// TODO Test this function
-	/**
-	 * This function starts a Remote Analog-To-Digital scheduled task, reading all input data from the given remote XBee device.
-	 * @param remoteDevice from where the data comes.
-	 * @throws TimeoutException
-	 * @throws XBeeException
-	 */
-	public void startRemoteADCTask(RemoteXBeeDevice remoteDevice) throws TimeoutException, XBeeException{
-		remoteDevice.setIOConfiguration(AnalogToDigitalConverter.IOLINE_IN, IOMode.ADC);
-		this.timer.schedule(new AnalogToDigitalConverter(remoteDevice), 0);
-	}
-	
-	// TODO Test this function
-	/**
-	 * This function stops all scheduled tasks in the timer.
-	 */
-	public void stopTimer(){
-		this.timer.cancel();
+		this.getDevice().getConnectionInterface().close();
+		this.getDevice().close();
 	}
 	
 	/**
@@ -214,13 +180,13 @@ public class DyNet {
 	 * @return The XBee device that this program is connected with.
 	 */
 	public XBeeDevice getDevice(){
-		return this.device;
+		return (XBeeDevice) this.config.get("DEVICE");
 	}
 	/**
 	 * @return The Network where the XBee device is connected to.
 	 */
 	public XBeeNetwork getDyNet(){
-		return this.dyNetwork;
+		return (XBeeNetwork) this.config.get("NETWORK");
 	};
 	/**
 	 * @param id The identification of the remote XBee device.
@@ -246,7 +212,33 @@ public class DyNet {
 		return this.config;
 	}
 	
+	/**
+	 * Gets the Discovering methodology of DyNet
+	 * @return
+	 */
 	public DyNetDiscovering getDiscovering(){
 		return this.discover;
+	}
+	
+	/**
+	 * Gets the Task Controller
+	 * @return
+	 */
+	public TaskController getTaskController(){
+		return this.taskcontroller;
+	}
+	
+	/**
+	 * This function resets all DyNet
+	 */
+	public void reset(){
+		try {
+			((XBeeDevice)this.config.get("DEVICE")).reset();
+		} catch (XBeeException e) {
+			Printer.error(e.getMessage());
+		} finally{
+			dyNet = new DyNet();
+			Printer.print("DyNet has been reseted.", TypeOfMessage.IMPORTANT);
+		}
 	}
 }

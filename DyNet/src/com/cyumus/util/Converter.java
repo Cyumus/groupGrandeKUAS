@@ -11,4 +11,13 @@ public abstract class Converter {
 	public static String byteToString(byte [] data){
 		return HexUtils.prettyHexString(HexUtils.byteArrayToHexString(data));
 	}
+	
+	/**
+	 * Transforms the String into hexadecimal data.
+	 * @param str -> a string of characters
+	 * @return -> hexadecimal data
+	 */
+	public static byte [] stringToBytes(String str){
+		return str.getBytes();
+	}
 }

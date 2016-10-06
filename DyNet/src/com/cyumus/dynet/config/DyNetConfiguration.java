@@ -8,6 +8,8 @@ import java.util.Properties;
 
 import com.cyumus.dynet.listeners.DyNetDataListener;
 import com.cyumus.dynet.listeners.DyNetListener;
+import com.cyumus.dynet.listeners.DyNetPacketListener;
+import com.cyumus.dynet.listeners.DyNetStatusListener;
 import com.cyumus.util.PortFinder;
 import com.cyumus.util.Printer;
 import com.cyumus.util.TypeOfMessage;
@@ -22,7 +24,7 @@ public class DyNetConfiguration {
 
 	// TODO Test this function with the file reading instead of the setParameter mess.
 	/**
-	 * This function configures the XBee device.
+	 * This class configures the XBee device.
 	 * First, it finds in which port it is connected.
 	 * Then, it opens the serial connection with the device.
 	 * When the connection is opened, it starts to set the main parameters.
@@ -59,6 +61,12 @@ public class DyNetConfiguration {
 			
 			// Creating the data listener
 			device.addDataListener(new DyNetDataListener());
+			
+			// Creating the modem status listener.
+			device.addModemStatusListener(new DyNetStatusListener());
+			
+			// Creating the packet listener.
+			device.addPacketListener(new DyNetPacketListener());
 			
 			this.config.put("DEVICE", device);
 			this.config.put("NETWORK", dyNetwork);
@@ -122,6 +130,11 @@ public class DyNetConfiguration {
 		}
 	}
 	
+	/**
+	 * This function returns the given configuration parameter
+	 * @param key
+	 * @return
+	 */
 	public Object get(String key){
 		return this.config.get(key);
 	}
