@@ -40,8 +40,15 @@ public class DyNetConfiguration {
 			this.config.put("DEFAULT_DISCOVERY_TIMEOUT", 15000);
 			
 			// Finds the port where the XBee device is plugged in.
-			this.config.put("PORT", "COM"+PortFinder.findPortAvailable(1));
-			Printer.print("Port available found: "+((String) this.config.get("PORT")), TypeOfMessage.CONFIG);
+			try{
+				PortFinder.setPort((Integer)this.config.get("BAUD_RATE"));
+				this.config.put("PORT", "COM"+PortFinder.findPortAvailable(1));
+				Printer.print("Port available found: "+((String) this.config.get("PORT")), TypeOfMessage.CONFIG);
+			}
+			catch(Exception e){
+				Printer.error("No port available found.");
+				System.exit(1);
+			}
 			
 			// Connects to the XBee Device using the port found before.
 			XBeeDevice device = new XBeeDevice((String) this.config.get("PORT"), (Integer) this.config.get("BAUD_RATE"));

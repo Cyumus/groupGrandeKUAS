@@ -6,6 +6,7 @@ import java.util.Timer;
 import com.cyumus.dynet.config.DyNetConfiguration;
 import com.cyumus.dynet.discovery.DyNetDiscover;
 import com.cyumus.dynet.discovery.DyNetDiscovering;
+import com.cyumus.dynet.system.plugins.PluginSystem;
 import com.cyumus.dynet.tasks.AnalogToDigitalConverterTask;
 import com.cyumus.dynet.tasks.DyNetAutodiscover;
 import com.cyumus.dynet.tasks.TaskController;
@@ -30,6 +31,8 @@ public class DyNet {
 	
 	private TaskController taskcontroller;
 	
+	private PluginSystem plugins;
+	
 	
 	/**
 	 * Main constructor of DyNet class
@@ -38,16 +41,18 @@ public class DyNet {
 	 */
 	private DyNet(){
 		this.remoteXBeeDevices = new HashMap<String, RemoteXBeeDevice>();
-		
+		this.plugins = new PluginSystem();/*
 		// Creates the configuration of the DyNet.
 		this.config = new DyNetConfiguration();
 		
-		this.discover = new DyNetDiscover();
+		this.discover = new DyNetDiscover();*/
+		
+		
 	}
 	
 	public static void main(String [] args){
 		DyNet dyNet = DyNet.getSingleton();
-		byte[] data = {0x1, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0x87, 0x65, 0x43, 0x21};
+		/*byte[] data = {0x1, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0x87, 0x65, 0x43, 0x21};
 		try{
 			dyNet.discover();
 		}
@@ -68,7 +73,7 @@ public class DyNet {
 		
 		System.out.println(">> Trying to send data to server...");
 		dyNet.sendToServer(dyNet.getDevice(), data);
-		/*System.out.println(">> Trying to close remote connection access...");
+		System.out.println(">> Trying to close remote connection access...");
 		dyNet.closeConnection("0013A20041040854 -  Receiver");*/
 		/*System.out.println(">> Trying to close serial connection...");
 		dyNet.closeConnection();*/
