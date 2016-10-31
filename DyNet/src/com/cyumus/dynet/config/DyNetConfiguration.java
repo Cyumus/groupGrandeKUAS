@@ -10,6 +10,7 @@ import com.cyumus.dynet.listeners.DyNetDataListener;
 import com.cyumus.dynet.listeners.DyNetListener;
 import com.cyumus.dynet.listeners.DyNetPacketListener;
 import com.cyumus.dynet.listeners.DyNetStatusListener;
+import com.cyumus.dynet.system.plugins.PluginController;
 import com.cyumus.util.PortFinder;
 import com.cyumus.util.Printer;
 import com.cyumus.util.TypeOfMessage;
@@ -29,6 +30,7 @@ public class DyNetConfiguration {
 	 * Then, it opens the serial connection with the device.
 	 * When the connection is opened, it starts to set the main parameters.
 	 * After that, it creates the listeners as the DyNetListener, to scan the network; and the DyNetDataListener, to receive data.
+	 * As an extra, it sets the plugin controller as wanted.
 	 * At last, it checks if the configuration was set correctly.
 	 */
 	public DyNetConfiguration(){
@@ -77,6 +79,9 @@ public class DyNetConfiguration {
 			
 			this.config.put("DEVICE", device);
 			this.config.put("NETWORK", dyNetwork);
+			
+			// TODO ControllerFactory
+			this.config.put("PLUGIN_CONTROLLER", new PluginController());
 			
 			Printer.print("All parameters were set correctly", TypeOfMessage.CONFIG);
 		}

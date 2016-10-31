@@ -20,7 +20,7 @@ import com.digi.xbee.api.exceptions.XBeeException;
 import com.digi.xbee.api.io.IOMode;
 import com.digi.xbee.api.models.XBee64BitAddress;
 
-public class DyNet {		
+public class DyNet implements DyNetUtilities{		
 	private DyNetConfiguration config;
 	
 	private DyNetDiscovering discover;
@@ -41,12 +41,12 @@ public class DyNet {
 	 */
 	private DyNet(){
 		this.remoteXBeeDevices = new HashMap<String, RemoteXBeeDevice>();
-		this.plugins = new PluginSystem();/*
+		this.plugins = new PluginSystem();
 		// Creates the configuration of the DyNet.
-		this.config = new DyNetConfiguration();
+		/*this.config = new DyNetConfiguration();
 		
-		this.discover = new DyNetDiscover();*/
-		
+		this.discover = new DyNetDiscover();
+		*/
 		
 	}
 	
@@ -71,7 +71,7 @@ public class DyNet {
 			e.printStackTrace();
 		}
 		
-		System.out.println(">> Trying to send data to server...");
+		/*System.out.println(">> Trying to send data to server...");
 		dyNet.sendToServer(dyNet.getDevice(), data);
 		System.out.println(">> Trying to close remote connection access...");
 		dyNet.closeConnection("0013A20041040854 -  Receiver");*/

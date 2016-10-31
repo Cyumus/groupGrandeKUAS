@@ -17,4 +17,8 @@ public abstract class Formatter {
 	public static String format(String msg, TypeOfMessage type){
 		return String.format(">> [%s]: %s", type, msg);
 	}
+	
+	public static String getFancyName(String string, int cant){
+		return string.substring(0,string.length()-cant);
+	}
 }

@@ -1,10 +1,13 @@
 package com.cyumus.dynet.system.plugins;
 
-import javax.swing.JComponent;
+import com.cyumus.dynet.DyNetUtilities;
 
-public interface Plugin {
-	public void load();
-	public void run();
-	public void unload();
-	public JComponent draw();
+public abstract class Plugin implements PluginUtilities{
+	protected DyNetUtilities controller;
+	public final void setController(PluginController controller){
+		this.controller = controller;
+	}
+	public final PluginController getController(){
+		return (PluginController) this.controller;
+	}
 }
